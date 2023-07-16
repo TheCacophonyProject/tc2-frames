@@ -23,7 +23,7 @@ pub static FRAME_BUFFER: DoubleBuffer = DoubleBuffer {
     front: Mutex::new(RefCell::new([0u8; 38400])),
     back: Mutex::new(RefCell::new([0u8; 38400])),
 };
-
+//
 pub struct DoubleBuffer {
     pub front: Mutex<RefCell<Frame>>,
     pub back: Mutex<RefCell<Frame>>,
