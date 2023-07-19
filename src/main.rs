@@ -3,7 +3,7 @@ use minifb::{Key, ScaleMode, Window, WindowOptions};
 use raqote::{DrawOptions, DrawTarget, Image, Point, SolidSource, Source};
 use std::cell::RefCell;
 use std::io::Read;
-use std::net::TcpListener;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 use std::sync::mpsc::channel;
 use std::sync::Mutex;
 use std::thread;
@@ -13,6 +13,10 @@ use std::time::Duration;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
 use font_kit::source::SystemSource;
+use local_ip_address::local_ip;
+use mdns_sd::{ServiceDaemon, ServiceInfo};
+use std::collections::HashMap;
+use std::net::IpAddr::V4;
 
 const WINDOW_WIDTH: usize = 640;
 const WINDOW_HEIGHT: usize = 480;
@@ -129,15 +133,45 @@ fn draw(dt: &mut DrawTarget, image_data: &mut [u32; 160 * 120], font: &Font) {
 }
 
 fn main() -> std::io::Result<()> {
+    let my_local_ip = local_ip().unwrap();
+    let port: u16 = 34254;
+
+    match my_local_ip {
+        V4(local_ip_v4) => {
+            // Create a daemon
+            let mdns = ServiceDaemon::new().expect("Failed to create daemon");
+
+            // Create a service info.
+            let service_type = "_mdns-tc2-frames._udp.local.";
+            let instance_name = "tc2-frames";
+            let port = 5200;
+            let properties = [("property_1", "test"), ("property_2", "1234")];
+            let my_service = ServiceInfo::new(
+                service_type,
+                instance_name,
+                &format!("{}.local.", local_ip_v4),
+                local_ip_v4,
+                port,
+                &properties[..],
+            )
+            .unwrap();
+
+            // Register with the daemon, which publishes the service.
+            mdns.register(my_service)
+                .expect("Failed to register our service");
+        }
+        _ => panic!("Unexpected ipV6 address"),
+    }
+
     let (tx, rx) = channel();
     let _ = thread::spawn(move || {
-        match TcpListener::bind("192.168.178.68:34254") {
+        match TcpListener::bind(SocketAddr::from((my_local_ip, port))) {
             Ok(listener) => {
                 // accept connections and process them serially
-                println!("Listening");
+                println!("Listening at {}", listener.local_addr().unwrap());
                 for stream in listener.incoming() {
                     if let Ok(mut stream) = stream {
-                        println!("Connected");
+                        println!("Connection from {}", stream.peer_addr().unwrap());
 
                         let mut buffer = [0u8; 39040];
                         // ...
