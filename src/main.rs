@@ -95,7 +95,7 @@ fn img_from_buffer(image_data: &mut [u32; 160 * 120]) -> Image {
 
 // TODO: fps counter
 // TODO: Send frame in 4 pieces, and do motion detection on each of them separately.
-fn draw(dt: &mut DrawTarget, image_data: &mut [u32; 160 * 120], font: &Font) {
+fn draw(dt: &mut DrawTarget, image_data: &mut [u32; 160 * 120], font: &Font, is_recording: bool) {
     let image = img_from_buffer(image_data);
     let scale_x = 1.0 / (WINDOW_WIDTH as f32 / 160.0);
     let scale_y = 1.0 / (WINDOW_HEIGHT as f32 / 120.0);
@@ -105,6 +105,12 @@ fn draw(dt: &mut DrawTarget, image_data: &mut [u32; 160 * 120], font: &Font) {
         raqote::FilterMode::Bilinear,
         raqote::Transform::scale(scale_x, scale_y),
     );
+    let red_circle = Source::Solid(SolidSource {
+        r: 0xff,
+        g: 0x00,
+        b: 0x00,
+        a: 0xff,
+    });
     dt.clear(SolidSource {
         r: 0x00,
         g: 0x00,
@@ -119,6 +125,17 @@ fn draw(dt: &mut DrawTarget, image_data: &mut [u32; 160 * 120], font: &Font) {
         &img,
         &DrawOptions::new(),
     );
+
+    if is_recording {
+        dt.fill_rect(
+            WINDOW_WIDTH as f32 - 30.0,
+            20.0,
+            10.0,
+            10.0,
+            &red_circle,
+            &DrawOptions::new(),
+        );
+    }
 
     // dt.draw_text(
     //     &font,*
@@ -176,12 +193,13 @@ fn main() -> std::io::Result<()> {
                         let mut buffer = [0u8; 39040];
                         // ...
                         while let Ok(_) = stream.read_exact(&mut buffer) {
+                            let is_recording = buffer[639] == 1;
                             {
                                 //println!("Got frame");
                                 let fb = FRAME_BUFFER.back.lock().unwrap();
                                 fb.borrow_mut().copy_from_slice(&buffer[TELEMETRY_LENGTH..]);
                             }
-                            tx.send(1).unwrap();
+                            tx.send(is_recording).unwrap();
                         }
                     }
                 }
@@ -210,8 +228,8 @@ fn main() -> std::io::Result<()> {
         .update_with_buffer(&draw_target.get_data(), width, height)
         .unwrap();
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if let Ok(_) = rx.try_recv() {
-            draw(&mut draw_target, &mut image_data, &font);
+        if let Ok(is_recording) = rx.try_recv() {
+            draw(&mut draw_target, &mut image_data, &font, is_recording);
         } else {
             sleep(Duration::from_millis(16));
         }
