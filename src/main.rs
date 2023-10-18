@@ -1,6 +1,8 @@
 use font_kit::font::Font;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
-use raqote::{DrawOptions, DrawTarget, Image, Point, SolidSource, Source};
+use raqote::{
+    DrawOptions, DrawTarget, Image, PathBuilder, Point, SolidSource, Source, StrokeStyle,
+};
 use std::cell::RefCell;
 use std::io::Read;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
@@ -127,14 +129,11 @@ fn draw(dt: &mut DrawTarget, image_data: &mut [u32; 160 * 120], font: &Font, is_
     );
 
     if is_recording {
-        dt.fill_rect(
-            WINDOW_WIDTH as f32 - 30.0,
-            20.0,
-            10.0,
-            10.0,
-            &red_circle,
-            &DrawOptions::new(),
-        );
+        let mut pb = PathBuilder::new();
+        pb.arc(WINDOW_WIDTH as f32 - 20.0, 20., 10., 0., 2. * 3.14159);
+        pb.close();
+        let path = pb.finish();
+        dt.fill(&path, &red_circle, &DrawOptions::new());
     }
 
     // dt.draw_text(
